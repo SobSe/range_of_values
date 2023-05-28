@@ -1,45 +1,53 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
 
-        List<Thread> threads = new ArrayList<>(texts.length);
+        List<Future<Integer>> futures = new ArrayList<>(texts.length);
+        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
         long startTs = System.currentTimeMillis(); // start time
         for (String text : texts) {
-            Thread thread = new Thread(() -> {int maxSize = 0;
-            for (int i = 0; i < text.length(); i++) {
-                for (int j = 0; j < text.length(); j++) {
-                    if (i >= j) {
-                        continue;
-                    }
-                    boolean bFound = false;
-                    for (int k = i; k < j; k++) {
-                        if (text.charAt(k) == 'b') {
-                            bFound = true;
-                            break;
+            futures.add(executorService.submit(() -> {int maxSize = 0;
+                for (int i = 0; i < text.length(); i++) {
+                    for (int j = 0; j < text.length(); j++) {
+                        if (i >= j) {
+                            continue;
+                        }
+                        boolean bFound = false;
+                        for (int k = i; k < j; k++) {
+                            if (text.charAt(k) == 'b') {
+                                bFound = true;
+                                break;
+                            }
+                        }
+                        if (!bFound && maxSize < j - i) {
+                            maxSize = j - i;
                         }
                     }
-                    if (!bFound && maxSize < j - i) {
-                        maxSize = j - i;
-                    }
                 }
+                System.out.println(text.substring(0, 100) + " -> " + maxSize);
+                return maxSize;}));
+        }
+        int lengthMaxRange = 0;
+        for (Future<Integer> future : futures) {
+            int result = future.get();
+            if (result > lengthMaxRange) {
+                lengthMaxRange = result;
             }
-            System.out.println(text.substring(0, 100) + " -> " + maxSize);});
-            thread.start();
-            threads.add(thread);
         }
-        for (Thread thread : threads) {
-            thread.join();
-        }
+        System.out.println("Max length range -> " + lengthMaxRange);
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
+
+        executorService.shutdown();
     }
 
     public static String generateText(String letters, int length) {
